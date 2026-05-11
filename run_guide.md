@@ -1,6 +1,6 @@
 # Panduan Menjalankan LUCID-DDoS
 
-Proyek ini adalah framework deteksi serangan DDoS berbasis Decision Tree. Berikut adalah langkah-langkah untuk menjalankannya:
+Proyek ini adalah framework deteksi serangan DDoS berbasis **Random Forest**. Berikut adalah langkah-langkah untuk menjalankannya:
 
 ## 1. Persiapan Lingkungan (Setup)
 
@@ -9,7 +9,7 @@ Pastikan Anda memiliki Python (disarankan v3.9) dan `tshark` terinstal di sistem
 ### Instalasi Dependensi
 Jalankan perintah berikut di terminal Anda:
 ```bash
-pip install tensorflow==2.7.1 scikit-learn h5py pyshark protobuf==3.19.6
+pip install tensorflow==2.7.1 scikit-learn h5py pyshark protobuf==3.19.6 joblib
 ```
 
 > [!IMPORTANT]
@@ -35,9 +35,9 @@ Ini akan menghasilkan file `.hdf5` yang siap digunakan untuk pelatihan.
 
 ## 3. Pelatihan Model (Training)
 
-Untuk melatih model Decision Tree menggunakan dataset yang sudah diproses:
+Untuk melatih model Random Forest menggunakan dataset yang sudah diproses:
 ```bash
-python lucid_decisiontree.py --train ./sample-dataset/
+python lucid_RF.py --train ./sample-dataset/ -cv 5
 ```
 Model terbaik akan disimpan di folder `output/` dengan ekstensi `.joblib`.
 
@@ -45,12 +45,12 @@ Model terbaik akan disimpan di folder `output/` dengan ekstensi `.joblib`.
 
 Setelah pelatihan selesai, Anda bisa menguji performa model:
 ```bash
-python lucid_decisiontree.py --predict ./sample-dataset/ --model ./output/10t-10n-DOS2019-LUCID-DT.joblib
+python lucid_RF.py --predict ./sample-dataset/ --model ./output/10t-10n-DOS2019-LUCID-RF.joblib
 ```
 
 ## 5. Inferensi Online (Opsional)
 
 Jika ingin mencoba mendeteksi langsung dari file `.pcap`:
 ```bash
-python lucid_decisiontree.py --predict_live ./sample-dataset/CIC-DDoS-2019-UDPLag.pcap --model ./output/10t-10n-DOS2019-LUCID-DT.joblib --dataset_type DOS2019
+python lucid_RF.py --predict_live ./sample-dataset/CIC-DDoS-2019-UDPLag.pcap --model ./output/10t-10n-DOS2019-LUCID-RF.joblib --dataset_type DOS2019
 ```

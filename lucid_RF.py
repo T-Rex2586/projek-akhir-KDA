@@ -15,8 +15,8 @@
 # limitations under the License.
 
 #Sample commands
-# Training: python3 lucid_cnn.py --train ./sample-dataset/  --epochs 100 -cv 5
-# Testing: python3  lucid_cnn.py --predict ./sample-dataset/ --model ./sample-dataset/10t-10n-SYN2020-LUCID-DT.joblib
+# Training: python lucid_RF.py --train ./sample-dataset/ -cv 5
+# Testing:  python lucid_RF.py --predict ./sample-dataset/ --model ./output/10t-10n-SYN2020-LUCID-RF.joblib
 
 import numpy as np
 import random as rn
@@ -33,8 +33,8 @@ rn.seed(SEED)
 
 from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 from sklearn.utils import shuffle
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
 import joblib
 from lucid_dataset_parser import *
 
@@ -44,25 +44,26 @@ DEFAULT_EPOCHS = 1000
 VAL_HEADER = ['Model', 'Samples', 'Accuracy', 'F1Score', 'Hyper-parameters','Validation Set']
 PREDICT_HEADER = ['Model', 'Time', 'Packets', 'Samples', 'DDOS%', 'Accuracy', 'F1Score', 'TPR', 'FPR','TNR', 'FNR', 'Source']
 
-# hyperparameters
+# hyperparameters for Random Forest
 hyperparameters = {
-    "max_depth": [None, 10, 20, 30],
+    "n_estimators": [50, 100, 200],
+    "max_depth": [None, 10, 20],
     "min_samples_split": [2, 5, 10],
     "min_samples_leaf": [1, 2, 4]
 }
 
 def main(argv):
-    help_string = 'Usage: python3 lucid_decisiontree.py --train <dataset_folder> -e <epocs>'
+    help_string = 'Usage: python lucid_RF.py --train <dataset_folder> -cv <folds>'
 
     parser = argparse.ArgumentParser(
-        description='DDoS attacks detection with decision trees',
+        description='DDoS attacks detection with Random Forest',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('-t', '--train', nargs='+', type=str,
                         help='Start the training process')
 
     parser.add_argument('-e', '--epochs', default=DEFAULT_EPOCHS, type=int,
-                        help='Training iterations')
+                        help='Training iterations (for compatibility, RF uses n_estimators)')
 
     parser.add_argument('-cv', '--cross_validation', default=0, type=int,
                         help='Number of folds for cross-validation (default 0)')
@@ -95,7 +96,7 @@ def main(argv):
 
     if args.train is not None:
         subfolders = glob.glob(args.train[0] +"/*/")
-        if len(subfolders) == 0: # for the case in which the is only one folder, and this folder is args.dataset_folder[0]
+        if len(subfolders) == 0: # for the case in which there is only one folder, and this folder is args.dataset_folder[0]
             subfolders = [args.train[0] + "/"]
         else:
             subfolders = sorted(subfolders)
@@ -109,7 +110,7 @@ def main(argv):
             X_train, Y_train = shuffle(X_train, Y_train, random_state=SEED)
             X_val, Y_val = shuffle(X_val, Y_val, random_state=SEED)
 
-            # reshape for Decision Tree
+            # reshape for Random Forest (2D input)
             X_train = np.array(X_train).reshape(X_train.shape[0], -1)
             X_val = np.array(X_val).reshape(X_val.shape[0], -1)
             Y_train = np.array(Y_train)
@@ -124,20 +125,20 @@ def main(argv):
 
             print ("\nCurrent dataset folder: ", dataset_folder)
 
-            model_name = dataset_name + "-LUCID-DT"
-            dt_classifier = DecisionTreeClassifier(random_state=SEED)
-            
+            model_name = dataset_name + "-LUCID-RF"
+            rf_classifier = RandomForestClassifier(random_state=SEED, n_jobs=-1)
+
             if args.cross_validation > 1:
                 cv = args.cross_validation
             else:
                 # Use a single fold with all data for both training and validation (effectively no CV)
                 cv = [(np.arange(X_train.shape[0]), np.arange(X_train.shape[0]))]
 
-            rnd_search_cv = GridSearchCV(dt_classifier, hyperparameters, cv=cv, refit=True, return_train_score=True)
+            rnd_search_cv = GridSearchCV(rf_classifier, hyperparameters, cv=cv, refit=True, return_train_score=True)
 
             best_model_filename = OUTPUT_FOLDER + str(time_window) + 't-' + str(max_flow_len) + 'n-' + model_name
-            
-            # For Decision Tree, no epochs or callbacks
+
+            # Fit Random Forest (no epochs needed)
             rnd_search_cv.fit(X_train, Y_train)
 
             # With refit=True (default) GridSearchCV refits the model on the whole training set (no folds) with the best
@@ -162,7 +163,6 @@ def main(argv):
                   'Hyper-parameters': rnd_search_cv.best_params_, "Validation Set": glob.glob(dataset_folder + "/*" + '-val.hdf5')[0]}
             val_writer.writerow(row)
             val_file.close()
-
 
             print("Best parameters: ", rnd_search_cv.best_params_)
             print("Best model path: ", best_model_filename)
@@ -216,7 +216,7 @@ def main(argv):
 
                     avg_time = avg_time / iterations
 
-                    report_results(np.squeeze(Y_true), Y_pred, packets, model_name_string, filename, avg_time,predict_writer)
+                    report_results(np.squeeze(Y_true), Y_pred, packets, model_name_string, filename, avg_time, predict_writer)
                     predict_file.flush()
 
         predict_file.close()
@@ -236,7 +236,7 @@ def main(argv):
             cap = pyshark.FileCapture(pcap_file)
             data_source = os.path.basename(pcap_file).strip()
         else:
-            cap =  pyshark.LiveCapture(interface=args.predict_live)
+            cap = pyshark.LiveCapture(interface=args.predict_live)
             data_source = args.predict_live
 
         print ("Prediction on network traffic from: ", data_source)
@@ -263,7 +263,7 @@ def main(argv):
         while (True):
             samples = process_live_traffic(cap, args.dataset_type, labels, max_flow_len, traffic_type="all", time_window=time_window)
             if len(samples) > 0:
-                X,Y_true,keys = dataset_to_list_of_fragments(samples)
+                X, Y_true, keys = dataset_to_list_of_fragments(samples)
                 X = np.array(normalize_and_padding(X, mins, maxs, max_flow_len))
                 if labels is not None:
                     Y_true = np.array(Y_true)
@@ -276,7 +276,7 @@ def main(argv):
                 Y_pred = model.predict(X)
                 pt1 = time.time()
                 prediction_time = pt1 - pt0
-                report_results(np.squeeze(Y_true), Y_pred, packets, model_name_string, data_source, prediction_time,predict_writer)
+                report_results(np.squeeze(Y_true), Y_pred, packets, model_name_string, data_source, prediction_time, predict_writer)
                 predict_file.flush()
 
             elif isinstance(cap, pyshark.FileCapture) == True:

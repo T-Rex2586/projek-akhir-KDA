@@ -1,6 +1,6 @@
 # LUCID-DDoS: Solusi Ringan Deteksi Serangan DDoS
-
-LUCID-DDoS adalah framework deteksi serangan DDoS berbasis Machine Learning yang dirancang untuk efisiensi tinggi pada lingkungan dengan sumber daya terbatas. Proyek ini mengintegrasikan mekanisme prapemrosesan trafik yang cerdas dengan algoritme **Decision Tree** untuk memberikan hasil deteksi yang cepat dan akurat.
+#
+LUCID-DDoS adalah framework deteksi serangan DDoS berbasis Machine Learning yang dirancang untuk efisiensi tinggi pada lingkungan dengan sumber daya terbatas. Proyek ini mengintegrasikan mekanisme prapemrosesan trafik yang cerdas dengan algoritme **Random Forest** untuk memberikan hasil deteksi yang cepat dan akurat.
 
 ---
 
@@ -28,21 +28,21 @@ python lucid_dataset_parser.py --preprocess_folder ./sample-dataset/
 ```
 
 ### 2. Pelatihan Model
-Latih model Decision Tree menggunakan dataset yang telah diproses:
+Latih model Random Forest menggunakan dataset yang telah diproses:
 ```bash
-python lucid_decisiontree.py --train ./sample-dataset/
+python lucid_RF.py --train ./sample-dataset/ -cv 5
 ```
 Model terbaik akan disimpan otomatis di folder `output/` dalam format `.joblib`.
 
 ### 3. Evaluasi & Inferensi
 **Uji model pada test set:**
 ```bash
-python lucid_decisiontree.py --predict ./sample-dataset/ --model ./output/10t-10n-DOS2019-LUCID-DT.joblib
+python lucid_RF.py --predict ./sample-dataset/ --model ./output/10t-10n-DOS2019-LUCID-RF.joblib
 ```
 
 **Inferensi langsung pada file PCAP:**
 ```bash
-python lucid_decisiontree.py --predict_live ./sample-dataset/CIC-DDoS-2019-UDPLag.pcap --model ./output/10t-10n-DOS2019-LUCID-DT.joblib --dataset_type DOS2019
+python lucid_RF.py --predict_live ./sample-dataset/CIC-DDoS-2019-UDPLag.pcap --model ./output/10t-10n-DOS2019-LUCID-RF.joblib --dataset_type DOS2019
 ```
 
 ---
