@@ -23,6 +23,8 @@ import random
 import hashlib
 import argparse
 import ipaddress
+import os
+
 from sklearn.feature_extraction.text import CountVectorizer
 from multiprocessing import Process, Manager, Value, Queue
 from util_functions import *
@@ -165,7 +167,7 @@ def process_pcap(pcap_file,dataset_type,in_labels,max_flow_len,labelled_flows,ma
     temp_dict = OrderedDict()
     start_time_window = -1
 
-    pcap_name = pcap_file.split("/")[-1]
+    pcap_name = os.path.basename(pcap_file)
     print("Processing file: ", pcap_name)
 
     cap = pyshark.FileCapture(pcap_file)
@@ -434,8 +436,7 @@ def main(argv):
             dataset_id = str(args.dataset_type[0])
 
         filename = str(int(time_window)) + 't-' + str(max_flow_len) + 'n-' + dataset_id + '-preprocess'
-        output_file = output_folder + '/' + filename
-        output_file = output_file.replace("//", "/") # remove double slashes when needed
+        output_file = os.path.join(output_folder, filename)
 
         with open(output_file + '.data', 'wb') as filehandle:
             # store the data as binary data stream
@@ -467,7 +468,7 @@ def main(argv):
         max_flow_len = None
         dataset_id = None
         for file in filelist:
-            filename = file.split('/')[-1].strip()
+            filename = os.path.basename(file).strip()
             current_time_window = int(filename.split('-')[0].strip().replace('t',''))
             current_max_flow_len = int(filename.split('-')[1].strip().replace('n',''))
             current_dataset_id = str(filename.split('-')[2].strip())
@@ -519,7 +520,7 @@ def main(argv):
         total_ddos_examples = np.count_nonzero(y_full)
         total_benign_examples = total_examples - total_ddos_examples
 
-        output_file = output_folder + '/' + str(time_window) + 't-' + str(max_flow_len) + 'n-' + dataset_id + '-dataset'
+        output_file = os.path.join(output_folder, str(time_window) + 't-' + str(max_flow_len) + 'n-' + dataset_id + '-dataset')
         if args.no_split == True: # don't split the dataset
             norm_X_full = normalize_and_padding(X_full, mins, maxs, max_flow_len)
             #norm_X_full = padding(X_full,max_flow_len) # only padding
@@ -666,7 +667,7 @@ def main(argv):
 
         for key,value in final_X.items():
             filename = output_filename_prefix + 'IDS201X-dataset-balanced-' + key + '.hdf5'
-            hf = h5py.File(output_folder + '/' + filename, 'w')
+            hf = h5py.File(os.path.join(output_folder, filename), 'w')
             hf.create_dataset('set_x', data=value)
             hf.create_dataset('set_y', data=final_y[key])
             hf.close()
