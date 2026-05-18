@@ -1,0 +1,12 @@
+venv/
+.venv/
+data/
+output/
+logs/
+models/
+__pycache__/
+*.pyc
+*.pyo
+*.pcap
+*.hdf5
+*.data

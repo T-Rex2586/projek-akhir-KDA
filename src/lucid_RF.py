@@ -15,8 +15,8 @@
 # limitations under the License.
 
 #Sample commands
-# Training: python lucid_RF.py --train ./sample-dataset/ -cv 5
-# Testing:  python lucid_RF.py --predict ./sample-dataset/ --model ./output/10t-10n-SYN2020-LUCID-RF.joblib
+# Training: python lucid_RF.py --train ./data/processed/ -cv 5
+# Testing:  python lucid_RF.py --predict ./data/processed/ --model ./output/10t-10n-SYN2020-LUCID-RF.joblib
 
 import numpy as np
 import random as rn
@@ -25,7 +25,7 @@ import csv
 import pprint
 import time
 import argparse
-from util_functions import *
+from src.util_functions import *
 # Seed Random Numbers
 os.environ['PYTHONHASHSEED']=str(SEED)
 np.random.seed(SEED)
@@ -36,7 +36,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 import joblib
-from lucid_dataset_parser import *
+from src.lucid_dataset_parser import *
 
 OUTPUT_FOLDER = "./output/"
 DEFAULT_EPOCHS = 1000

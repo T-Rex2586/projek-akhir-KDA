@@ -1,0 +1,67 @@
+services:
+  controller:
+    build: .
+    container_name: ddos-controller
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ./output:/app/output
+      - ./data:/app/data
+    command: >
+      python -m src.lucid_RF --train ./data/processed/ -cv 5
+    networks:
+      - ddos-net
+
+  dashboard:
+    build: .
+    container_name: ddos-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./logs:/app/logs
+      - ./output:/app/output
+      - ./models:/app/models
+    command: >
+      streamlit run dashboard/streamlit_app.py
+      --server.port 8501
+      --server.address 0.0.0.0
+    depends_on:
+      - controller
+    networks:
+      - ddos-net
+
+  trainer:
+    build: .
+    container_name: ddos-trainer
+    volumes:
+      - ./models:/app/models
+      - ./output:/app/output
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: >
+      python training/train_model.py
+      --dataset_folder ./data/processed/
+      --cv 5
+    networks:
+      - ddos-net
+
+  evaluator:
+    build: .
+    container_name: ddos-evaluator
+    volumes:
+      - ./models:/app/models
+      - ./output:/app/output
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: >
+      python training/evaluate_model.py
+      --dataset_folder ./data/processed/
+      --model ./output/10t-10n-DOS2019-LUCID-RF.joblib
+    depends_on:
+      - trainer
+    networks:
+      - ddos-net
+
+networks:
+  ddos-net:
+    driver: bridge

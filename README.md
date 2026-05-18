@@ -21,28 +21,28 @@ LUCID-DDoS adalah framework deteksi serangan DDoS berbasis Machine Learning yang
 Ubah file trafik mentah (`.pcap`) menjadi dataset fitur:
 ```bash
 # Tahap 1: Ekstraksi fitur dari PCAP
-python lucid_dataset_parser.py --dataset_type DOS2019 --dataset_folder ./sample-dataset/ --packets_per_flow 10 --dataset_id DOS2019 --traffic_type all --time_window 10
+python -m src.lucid_dataset_parser --dataset_type DOS2019 --dataset_folder ./data/raw/ --output_folder ./data/processed/ --packets_per_flow 10 --dataset_id DOS2019 --traffic_type all --time_window 10
 
 # Tahap 2: Finalisasi dan normalisasi dataset
-python lucid_dataset_parser.py --preprocess_folder ./sample-dataset/
+python -m src.lucid_dataset_parser --preprocess_folder ./data/processed/
 ```
 
 ### 2. Pelatihan Model
 Latih model Random Forest menggunakan dataset yang telah diproses:
 ```bash
-python lucid_RF.py --train ./sample-dataset/ -cv 5
+python -m src.lucid_RF --train ./data/processed/ -cv 5
 ```
 Model terbaik akan disimpan otomatis di folder `output/` dalam format `.joblib`.
 
 ### 3. Evaluasi & Inferensi
 **Uji model pada test set:**
 ```bash
-python lucid_RF.py --predict ./sample-dataset/ --model ./output/10t-10n-DOS2019-LUCID-RF.joblib
+python -m src.lucid_RF --predict ./data/processed/ --model ./output/10t-10n-DOS2019-LUCID-RF.joblib
 ```
 
 **Inferensi langsung pada file PCAP:**
 ```bash
-python lucid_RF.py --predict_live ./sample-dataset/CIC-DDoS-2019-UDPLag.pcap --model ./output/10t-10n-DOS2019-LUCID-RF.joblib --dataset_type DOS2019
+python -m src.lucid_RF --predict_live ./data/raw/CIC-DDoS-2019-UDPLag.pcap --model ./output/10t-10n-DOS2019-LUCID-RF.joblib --dataset_type DOS2019
 ```
 
 ---

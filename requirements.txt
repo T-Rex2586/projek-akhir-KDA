@@ -1,0 +1,12 @@
+ryu
+eventlet==0.30.2
+scikit-learn
+pandas
+numpy
+joblib
+streamlit
+matplotlib
+seaborn
+h5py
+pyshark
+protobuf==3.19.6

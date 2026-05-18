@@ -27,12 +27,12 @@ import os
 
 from sklearn.feature_extraction.text import CountVectorizer
 from multiprocessing import Process, Manager, Value, Queue
-from util_functions import *
+from src.util_functions import *
 
 # Sample commands
 # split a pcap file into smaller chunks to leverage multi-core CPUs: tcpdump -r dataset.pcap -w dataset-chunk -C 1000
-# dataset parsing (first step): python3 lucid_dataset_parser.py --dataset_type SYN2020 --dataset_folder ./sample-dataset/ --packets_per_flow 10 --dataset_id SYN2020 --traffic_type all --time_window 10
-# dataset parsing (second step): python3 lucid_dataset_parser.py --preprocess_folder ./sample-dataset/
+# dataset parsing (first step): python3 lucid_dataset_parser.py --dataset_type SYN2020 --dataset_folder ./data/raw/ --output_folder ./data/processed/ --packets_per_flow 10 --dataset_id SYN2020 --traffic_type all --time_window 10
+# dataset parsing (second step): python3 lucid_dataset_parser.py --preprocess_folder ./data/processed/
 
 IDS2018_DDOS_FLOWS = {'attackers': ['18.218.115.60', '18.219.9.1','18.219.32.43','18.218.55.126','52.14.136.135','18.219.5.43','18.216.200.189','18.218.229.235','18.218.11.51','18.216.24.42'],
                       'victims': ['18.218.83.150','172.31.69.28']}
@@ -40,8 +40,8 @@ IDS2018_DDOS_FLOWS = {'attackers': ['18.218.115.60', '18.219.9.1','18.219.32.43'
 IDS2017_DDOS_FLOWS = {'attackers': ['172.16.0.1'],
                       'victims': ['192.168.10.50']}
 
-CUSTOM_DDOS_SYN = {'attackers': ['11.0.0.' + str(x) for x in range(1,255)],
-                      'victims': ['10.42.0.2']}
+CUSTOM_DDOS_SYN = {'attackers': ['10.0.1.' + str(x) for x in range(1,255)],
+                      'victims': ['10.0.2.1', '10.0.2.2', '10.0.2.3', '10.0.2.4']}
 
 DOS2019_FLOWS = {'attackers': ['172.16.0.5'], 'victims': ['192.168.50.1', '192.168.50.4']}
 
