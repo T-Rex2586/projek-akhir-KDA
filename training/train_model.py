@@ -25,7 +25,6 @@ from src.util_functions import SEED
 
 MODELS_FOLDER = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models")
 
-# Hyperparameters as specified in CLAUDE.md Phase 4
 HYPERPARAMETERS = {
     "n_estimators": [50, 100, 200],
     "max_depth": [None, 10, 20],
@@ -60,14 +59,12 @@ def train_random_forest(X_train, Y_train, X_val=None, Y_val=None, cv=5, hyperpar
     print(f"Cross-validation folds: {cv}")
     print(f"Hyperparameter grid: {hyperparameters}")
 
-    # Initialize Random Forest as per CLAUDE.md
     rf_classifier = RandomForestClassifier(
         random_state=SEED,
         n_jobs=-1,
         class_weight='balanced'
     )
 
-    # GridSearchCV with cross-validation
     start_time = time.time()
     grid_search = GridSearchCV(
         rf_classifier,

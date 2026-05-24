@@ -41,7 +41,7 @@ from controller.feature_extractor import FeatureExtractor
 from controller.mitigation import MitigationEngine
 
 MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                          "models", "rf_ddos_model.pkl")
+                          "models", "rf_ddos_sdn_model.pkl")
 MONITOR_INTERVAL = 10  # seconds
 
 
@@ -63,6 +63,7 @@ if RYU_AVAILABLE:
             self.feature_extractor = FeatureExtractor(time_window=MONITOR_INTERVAL)
             self.mitigation = MitigationEngine()
             self.datapaths = {}
+            self.pkt_count = 0
             self.monitor_thread = hub.spawn(self._monitor)
             self.logger.info("DDoS Detector initialized with RF model")
 
@@ -85,17 +86,19 @@ if RYU_AVAILABLE:
             parser = datapath.ofproto_parser
             self.datapaths[datapath.id] = datapath
             self.mitigation.datapath = datapath
+            # Table-miss: send unknown packets to controller
             match = parser.OFPMatch()
             actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)]
             self._add_flow(datapath, 0, match, actions)
             self.logger.info(f"Switch {datapath.id} connected")
 
-        def _add_flow(self, datapath, priority, match, actions, hard_timeout=0):
+        def _add_flow(self, datapath, priority, match, actions, hard_timeout=0, idle_timeout=0):
             ofproto = datapath.ofproto
             parser = datapath.ofproto_parser
             inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
             mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
-                match=match, instructions=inst, hard_timeout=hard_timeout)
+                match=match, instructions=inst,
+                hard_timeout=hard_timeout, idle_timeout=idle_timeout)
             datapath.send_msg(mod)
 
         # ------------------------------------------------------------------
@@ -107,7 +110,12 @@ if RYU_AVAILABLE:
         # ------------------------------------------------------------------
         @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
         def packet_in_handler(self, ev):
-            """Handle packet-in events — implement L2 learning switch."""
+            """Handle packet-in events — implement learning switch with L3 flows.
+
+            Installs L3 (IPv4) flow rules so that flow stats contain
+            ipv4_src/ipv4_dst fields, enabling DDoS detection in
+            flow_stats_reply_handler.
+            """
             msg = ev.msg
             datapath = msg.datapath
             ofproto = datapath.ofproto
@@ -127,6 +135,8 @@ if RYU_AVAILABLE:
             src = eth.src
             dpid = datapath.id
 
+            self.pkt_count += 1
+
             self.mac_to_port.setdefault(dpid, {})
 
             # Learn: associate source MAC with the ingress port
@@ -142,8 +152,23 @@ if RYU_AVAILABLE:
 
             # Install a flow rule so future packets don't hit the controller
             if out_port != ofproto.OFPP_FLOOD:
-                match = parser.OFPMatch(in_port=in_port, eth_dst=dst, eth_src=src)
-                self._add_flow(datapath, 1, match, actions)
+                ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
+                if ipv4_pkt:
+                    # L3 flow: match on IP src/dst so stats carry ipv4_src
+                    if self.pkt_count % 100 == 0 or self.pkt_count == 1:
+                        self.logger.info(f"  Installing L3 flow: {ipv4_pkt.src} -> {ipv4_pkt.dst}")
+                    match = parser.OFPMatch(
+                        in_port=in_port,
+                        eth_type=ether_types.ETH_TYPE_IP,
+                        ipv4_src=ipv4_pkt.src,
+                        ipv4_dst=ipv4_pkt.dst,
+                    )
+                    self._add_flow(datapath, 1, match, actions, idle_timeout=30)
+                # Non-IP traffic (ARP, etc.): don't install any flow
+                # so they always go through the controller.
+                # This prevents L2 flows from masking L3 traffic.
+                elif self.pkt_count % 100 == 0 or self.pkt_count == 1:
+                    self.logger.info(f"  Skipping flow install for non-IP (eth_type={eth.ethertype})")
 
             # Send the buffered/received packet out
             data = None
@@ -168,15 +193,24 @@ if RYU_AVAILABLE:
             body = ev.msg.body
             datapath = ev.msg.datapath
 
+            if not body:
+                return
+
             flow_stats = []
             for stat in body:
-                if 'ipv4_src' in stat.match:
+                try:
+                    src_ip = stat.match.get('ipv4_src', None)
+                except Exception:
+                    src_ip = None
+                if src_ip is not None:
+                    dst_port = stat.match.get('tcp_dst', stat.match.get('udp_dst', 0))
+                    src_port = stat.match.get('tcp_src', stat.match.get('udp_src', 0))
                     flow_stats.append({
-                        'src_ip': stat.match['ipv4_src'],
+                        'src_ip': src_ip,
                         'packet_count': stat.packet_count,
                         'byte_count': stat.byte_count,
-                        'dst_port': stat.match.get('tcp_dst', stat.match.get('udp_dst', 0)),
-                        'src_port': stat.match.get('tcp_src', stat.match.get('udp_src', 0)),
+                        'dst_port': dst_port,
+                        'src_port': src_port,
                     })
 
             if not flow_stats:
@@ -186,7 +220,9 @@ if RYU_AVAILABLE:
             features = self.feature_extractor.extract_sdn_features(flow_stats)
             features_2d = features.reshape(1, -1)
 
+            self.logger.info(f"  Features: {features}")
             predictions, confidence, det_time = self.predictor.predict(features_2d)
+            self.logger.info(f"  Prediction: {predictions[0]}, Confidence: {confidence[0]:.4f}")
 
             if predictions[0] == 1:
                 # DDoS detected! Find top attacker IP
